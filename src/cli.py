@@ -1,0 +1,142 @@
+"""CLI entry point.
+
+Commands:
+  train    — compare all models, pick the best one, save it to artifacts/
+  compare  — compare all models and print a results table (no saving)
+  predict  — load a saved model and predict on test.csv
+
+Usage:
+  python src/cli.py train   --train data/raw/train.csv
+  python src/cli.py compare --train data/raw/train.csv
+  python src/cli.py predict --train data/raw/train.csv --test data/raw/test.csv --model random_forest
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+import pandas as pd
+
+# Ensure src/ is on the path when invoked from the project root
+sys.path.insert(0, str(Path(__file__).parent))
+
+from data_loader import load_data
+from preprocessor import preprocess
+from trainer import (
+    compare_models,
+    train_best_model,
+    load_model,
+    predict,
+    evaluate_model,
+)
+from model_factory import available_models
+from formatters.results import format_comparison_table, format_best_model
+
+
+def cmd_compare(args: argparse.Namespace) -> None:
+    print(f"Loading data from {args.train} …")
+    df = load_data(args.train, data_dir=".")
+    processed = preprocess(df)
+
+    print("Running cross-validation for all models …\n")
+    results = compare_models(processed)
+    print(format_comparison_table(results))
+
+
+def cmd_train(args: argparse.Namespace) -> None:
+    print(f"Loading data from {args.train} …")
+    df = load_data(args.train, data_dir=".")
+    processed = preprocess(df)
+
+    print("Evaluating models …")
+    X, y = _split(processed)
+    results = {name: evaluate_model(name, X, y) for name in available_models()}
+    print(format_comparison_table(results))
+
+    best_name = max(results, key=lambda n: results[n]["roc_auc_mean"])
+    print(f"\nTraining best model ({best_name}) on full dataset …")
+    best_name, _ = train_best_model(processed)
+    print(f"Model saved to artifacts/{best_name}.pkl")
+    print(format_best_model(best_name, results[best_name]))
+
+
+def cmd_predict(args: argparse.Namespace) -> None:
+    print(f"Loading training data from {args.train} to build preprocessor context …")
+    train_df = load_data(args.train, data_dir=".")
+
+    print(f"Loading test data from {args.test} …")
+    test_df = load_data(args.test, data_dir=".")
+
+    # Combine for consistent ticket group sizes / fare per person
+    combined = preprocess(pd.concat([train_df, test_df], ignore_index=True))
+    test_rows = combined.iloc[len(train_df) :]
+    X_test = test_rows.drop(columns=["Survived"], errors="ignore")
+
+    try:
+        pipeline = load_model(args.model)
+    except FileNotFoundError as e:
+        print(
+            f"ERROR: {e}\nDid you run 'python src/cli.py train'? Model must be trained and saved before prediction."
+        )
+        sys.exit(1)
+
+    predictions = predict(pipeline, X_test)
+
+    output = pd.DataFrame(
+        {"PassengerId": test_df["PassengerId"], "Survived": predictions}
+    )
+    output_path = Path("artifacts") / "predictions.csv"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output.to_csv(output_path, index=False)
+    print(f"Predictions saved to {output_path}")
+
+
+def _split(processed):
+    y = processed["Survived"]
+    X = processed.drop(columns=["Survived"])
+    return X, y
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Titanic survival predictor CLI",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # compare
+    p_compare = subparsers.add_parser("compare", help="Compare all models")
+    p_compare.add_argument(
+        "--train", default="data/raw/train.csv", help="Path to training CSV"
+    )
+
+    # train
+    p_train = subparsers.add_parser("train", help="Train and save best model")
+    p_train.add_argument(
+        "--train", default="data/raw/train.csv", help="Path to training CSV"
+    )
+
+    # predict
+    p_predict = subparsers.add_parser("predict", help="Predict on test data")
+    p_predict.add_argument(
+        "--train", default="data/raw/train.csv", help="Path to training CSV"
+    )
+    p_predict.add_argument(
+        "--test", default="data/raw/test.csv", help="Path to test CSV"
+    )
+    p_predict.add_argument(
+        "--model", required=True, help="Saved model name (without .pkl)"
+    )
+
+    args = parser.parse_args()
+
+    if args.command == "compare":
+        cmd_compare(args)
+    elif args.command == "train":
+        cmd_train(args)
+    elif args.command == "predict":
+        cmd_predict(args)
+
+
+if __name__ == "__main__":
+    main()

@@ -39,4 +39,48 @@ Predict Titanic passenger survival using robust ML pipelines, real-world data pr
 
 ---
 
-Further steps and CLI usage will be documented as the project progresses.
+## CLI Usage
+
+All main operations are available via the CLI:
+
+```bash
+python src/cli.py compare --train data/raw/train.csv
+python src/cli.py train   --train data/raw/train.csv
+python src/cli.py predict --train data/raw/train.csv --test data/raw/test.csv --model random_forest
+```
+
+- `compare`: Compare all models and print cross-validation results.
+- `train`:   Train all models, pick the best (by ROC-AUC), save to `artifacts/`.
+- `predict`: Load a saved model and predict on test data, saving predictions to `artifacts/predictions.csv`.
+
+---
+
+## Project Structure
+
+- `src/preprocessor.py`   — Feature engineering and preprocessing
+- `src/model_factory.py`  — Model definitions and pipelines
+- `src/trainer.py`        — Training, evaluation, model selection, artifact saving
+- `src/cli.py`            — CLI entry point (no business logic)
+- `src/formatters/`       — Output formatting helpers
+- `data/raw/`             — Original dataset files
+- `data/processed/`       — (optional) Processed datasets
+- `artifacts/`            — Saved models, predictions
+- `tests/`                — Unit tests (synthetic, fast, no I/O)
+
+---
+
+## Running Tests
+
+All tests are synthetic and fast:
+
+```bash
+PYTHONPATH=src pytest tests/ -v
+```
+
+---
+
+## Notes
+- All code is modular, DRY, and KISS.
+- No business logic in CLI.
+- Feature engineering and model selection are fully reproducible.
+- See `agents.md` for architecture and style rules.
