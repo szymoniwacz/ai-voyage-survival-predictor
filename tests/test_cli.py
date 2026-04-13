@@ -15,7 +15,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 import cli
-from cli import _split, cmd_compare, cmd_train, cmd_predict
+from cli import _split, cmd_compare, cmd_train, cmd_train_all, cmd_predict
 
 
 # ---------------------------------------------------------------------------
@@ -94,6 +94,45 @@ def test_cmd_train_calls_train_best_model(
     args = argparse.Namespace(train="data/raw/train.csv")
     cmd_train(args)
     mock_train.assert_called_once()
+    out = capsys.readouterr().out
+    assert "TABLE" in out
+
+
+@patch("cli.train_all_models", return_value={"random_forest": MagicMock()})
+@patch("cli.format_comparison_table", return_value="TABLE")
+@patch(
+    "cli.evaluate_model",
+    return_value={
+        "accuracy_mean": 0.8,
+        "accuracy_std": 0.01,
+        "f1_mean": 0.75,
+        "f1_std": 0.02,
+        "roc_auc_mean": 0.82,
+        "roc_auc_std": 0.01,
+    },
+)
+@patch("cli.available_models", return_value=["random_forest"])
+@patch("cli.preprocess")
+@patch("cli.load_data", return_value=pd.DataFrame({"a": [1]}))
+def test_cmd_train_all_calls_train_all_models(
+    mock_load,
+    mock_preprocess,
+    mock_available,
+    mock_eval,
+    mock_fmt,
+    mock_train_all,
+    capsys,
+):
+    processed = pd.DataFrame(
+        {
+            "Survived": [0, 1],
+            "Age": [22.0, 38.0],
+        }
+    )
+    mock_preprocess.return_value = processed
+    args = argparse.Namespace(train="data/raw/train.csv")
+    cmd_train_all(args)
+    mock_train_all.assert_called_once()
     out = capsys.readouterr().out
     assert "TABLE" in out
 
@@ -215,6 +254,32 @@ def test_main_routes_train(monkeypatch):
         cli.main()
 
     assert called.get("cmd") == "train"
+
+
+def test_main_routes_train_best(monkeypatch):
+    called = {}
+
+    def fake_train(args):
+        called["cmd"] = "train"
+
+    monkeypatch.setattr(cli, "cmd_train", fake_train)
+    with patch("sys.argv", ["cli.py", "train_best", "--train", "data/raw/train.csv"]):
+        cli.main()
+
+    assert called.get("cmd") == "train"
+
+
+def test_main_routes_train_all(monkeypatch):
+    called = {}
+
+    def fake_train_all(args):
+        called["cmd"] = "train_all"
+
+    monkeypatch.setattr(cli, "cmd_train_all", fake_train_all)
+    with patch("sys.argv", ["cli.py", "train_all", "--train", "data/raw/train.csv"]):
+        cli.main()
+
+    assert called.get("cmd") == "train_all"
 
 
 def test_main_routes_predict(monkeypatch):

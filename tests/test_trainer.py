@@ -8,6 +8,7 @@ from trainer import (
     evaluate_model,
     compare_models,
     train_best_model,
+    train_all_models,
     predict,
 )
 
@@ -174,6 +175,18 @@ def test_train_best_model_saves_pkl(synthetic_df, tmp_path, monkeypatch):
 
     best_name, _ = train_best_model(synthetic_df)
     assert (tmp_path / f"{best_name}.pkl").exists()
+
+
+def test_train_all_models_saves_all_pkls(synthetic_df, tmp_path, monkeypatch):
+    import trainer as trainer_module
+
+    monkeypatch.setattr(trainer_module, "ARTIFACTS_DIR", tmp_path)
+
+    trained = train_all_models(synthetic_df)
+    assert set(trained.keys()) == set(available_models())
+
+    for model_name in available_models():
+        assert (tmp_path / f"{model_name}.pkl").exists()
 
 
 # ---------------------------------------------------------------------------

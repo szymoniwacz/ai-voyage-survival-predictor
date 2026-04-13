@@ -49,18 +49,40 @@ def compare_models(df: pd.DataFrame) -> dict[str, dict]:
     return {name: evaluate_model(name, X, y) for name in available_models()}
 
 
+def _select_best_model_name(df: pd.DataFrame) -> str:
+    """Select best model by ROC-AUC mean from cross-validation comparison."""
+    comparison = compare_models(df)
+    return max(comparison, key=lambda n: comparison[n]["roc_auc_mean"])
+
+
 def train_best_model(df: pd.DataFrame) -> tuple[str, object]:
     """Train the best model (by ROC-AUC) on the full dataset and save it.
 
     Returns the best model name and the fitted pipeline.
     """
-    comparison = compare_models(df)
-    best_name = max(comparison, key=lambda n: comparison[n]["roc_auc_mean"])
+    best_name = _select_best_model_name(df)
     X, y = _split_features_target(df)
     best_pipeline = get_model(best_name)
     best_pipeline.fit(X, y)
     _save_model(best_name, best_pipeline)
     return best_name, best_pipeline
+
+
+def train_all_models(df: pd.DataFrame) -> dict[str, object]:
+    """Train all available models on the full dataset and save each artifact.
+
+    Returns a mapping: model_name -> fitted pipeline.
+    """
+    X, y = _split_features_target(df)
+    trained_models: dict[str, object] = {}
+
+    for model_name in available_models():
+        pipeline = get_model(model_name)
+        pipeline.fit(X, y)
+        _save_model(model_name, pipeline)
+        trained_models[model_name] = pipeline
+
+    return trained_models
 
 
 def _save_model(name: str, pipeline: object) -> Path:

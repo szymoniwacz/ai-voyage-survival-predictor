@@ -1,12 +1,16 @@
 """CLI entry point.
 
 Commands:
-  train    — compare all models, pick the best one, save it to artifacts/
+    train_best — compare all models, pick the best one, save it to artifacts/
+    train_all  — train all models and save each to artifacts/
+    train      — alias for train_best (backward compatibility)
   compare  — compare all models and print a results table (no saving)
   predict  — load a saved model and predict on test.csv
 
 Usage:
-  python src/cli.py train   --train data/raw/train.csv
+    python src/cli.py train_best --train data/raw/train.csv
+    python src/cli.py train_all  --train data/raw/train.csv
+    python src/cli.py train      --train data/raw/train.csv
   python src/cli.py compare --train data/raw/train.csv
   python src/cli.py predict --train data/raw/train.csv --test data/raw/test.csv --model random_forest
 """
@@ -25,6 +29,7 @@ from preprocessor import preprocess
 from trainer import (
     compare_models,
     train_best_model,
+    train_all_models,
     load_model,
     predict,
     evaluate_model,
@@ -58,6 +63,22 @@ def cmd_train(args: argparse.Namespace) -> None:
     best_name, _ = train_best_model(processed)
     print(f"Model saved to artifacts/{best_name}.pkl")
     print(format_best_model(best_name, results[best_name]))
+
+
+def cmd_train_all(args: argparse.Namespace) -> None:
+    print(f"Loading data from {args.train} …")
+    df = load_data(args.train, data_dir=".")
+    processed = preprocess(df)
+
+    print("Evaluating models …")
+    X, y = _split(processed)
+    results = {name: evaluate_model(name, X, y) for name in available_models()}
+    print(format_comparison_table(results))
+
+    print("\nTraining all models on full dataset …")
+    trained = train_all_models(processed)
+    for model_name in trained:
+        print(f"Model saved to artifacts/{model_name}.pkl")
 
 
 def cmd_predict(args: argparse.Namespace) -> None:
@@ -110,9 +131,25 @@ def main() -> None:
         "--train", default="data/raw/train.csv", help="Path to training CSV"
     )
 
-    # train
-    p_train = subparsers.add_parser("train", help="Train and save best model")
-    p_train.add_argument(
+    # train_best
+    p_train_best = subparsers.add_parser(
+        "train_best", help="Train and save the best model"
+    )
+    p_train_best.add_argument(
+        "--train", default="data/raw/train.csv", help="Path to training CSV"
+    )
+
+    # train_all
+    p_train_all = subparsers.add_parser("train_all", help="Train and save all models")
+    p_train_all.add_argument(
+        "--train", default="data/raw/train.csv", help="Path to training CSV"
+    )
+
+    # train (alias for train_best)
+    p_train_alias = subparsers.add_parser(
+        "train", help="Alias for train_best (train and save best model)"
+    )
+    p_train_alias.add_argument(
         "--train", default="data/raw/train.csv", help="Path to training CSV"
     )
 
@@ -132,8 +169,10 @@ def main() -> None:
 
     if args.command == "compare":
         cmd_compare(args)
-    elif args.command == "train":
+    elif args.command in {"train", "train_best"}:
         cmd_train(args)
+    elif args.command == "train_all":
+        cmd_train_all(args)
     elif args.command == "predict":
         cmd_predict(args)
 

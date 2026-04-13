@@ -35,7 +35,7 @@ Predict Titanic passenger survival using robust ML pipelines, real-world data pr
     pip install -r requirements.txt
     ```
 2. Data files are already present in `data/raw/`.
-3. Run training or prediction scripts (to be implemented in `src/`).
+3. Run model comparison, training, and prediction from the CLI.
 
 ---
 
@@ -45,13 +45,20 @@ All main operations are available via the CLI:
 
 ```bash
 python src/cli.py compare --train data/raw/train.csv
-python src/cli.py train   --train data/raw/train.csv
-python src/cli.py predict --train data/raw/train.csv --test data/raw/test.csv --model random_forest
+python src/cli.py train_best --train data/raw/train.csv
+python src/cli.py train_all  --train data/raw/train.csv
+python src/cli.py predict    --train data/raw/train.csv --test data/raw/test.csv --model gradient_boosting
 ```
 
 - `compare`: Compare all models and print cross-validation results.
-- `train`:   Train all models, pick the best (by ROC-AUC), save to `artifacts/`.
+- `train_best`: Evaluate all models, train the best (by ROC-AUC), and save it to `artifacts/`.
+- `train_all`: Train and save all supported models to `artifacts/`.
+- `train`: Alias for `train_best` (backward compatibility).
 - `predict`: Load a saved model and predict on test data, saving predictions to `artifacts/predictions.csv`.
+
+Notes:
+- `predict --model <name>` must match an existing artifact file: `artifacts/<name>.pkl`.
+- The best model can change between runs; check training output before selecting `--model`.
 
 ---
 
