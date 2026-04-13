@@ -1,5 +1,7 @@
 # AI Voyage Survival Predictor
 
+[![Python Tests](https://github.com/szymoniwacz/ai-voyage-survival-predictor/actions/workflows/python-tests.yml/badge.svg?branch=main)](https://github.com/szymoniwacz/ai-voyage-survival-predictor/actions/workflows/python-tests.yml)
+
 A modular machine learning project for predicting passenger survival on the Titanic (Kaggle competition).
 
 ---
