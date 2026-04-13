@@ -4,14 +4,16 @@ Commands:
     train_best — compare all models, pick the best one, save it to artifacts/
     train_all  — train all models and save each to artifacts/
     train      — alias for train_best (backward compatibility)
-  compare  — compare all models and print a results table (no saving)
-  predict  — load a saved model and predict on test.csv
+    compare.   — compare all models and print a results table (no saving)
+    eda        — generate a compact EDA summary and save it to artifacts/
+    predict    — load a saved model and predict on test.csv
 
 Usage:
     python src/cli.py train_best --train data/raw/train.csv
     python src/cli.py train_all  --train data/raw/train.csv
     python src/cli.py train      --train data/raw/train.csv
-  python src/cli.py compare --train data/raw/train.csv
+    python src/cli.py compare.   --train data/raw/train.csv
+    python src/cli.py eda        --train data/raw/train.csv
   python src/cli.py predict --train data/raw/train.csv --test data/raw/test.csv --model random_forest
 """
 
@@ -26,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from data_loader import load_data
 from preprocessor import preprocess
+from eda import build_eda_summary, format_eda_summary, save_eda_summary
 from trainer import (
     compare_models,
     train_best_model,
@@ -112,6 +115,16 @@ def cmd_predict(args: argparse.Namespace) -> None:
     print(f"Predictions saved to {output_path}")
 
 
+def cmd_eda(args: argparse.Namespace) -> None:
+    print(f"Loading data from {args.train} ...")
+    df = load_data(args.train, data_dir=".")
+
+    summary = build_eda_summary(df)
+    print("\n" + format_eda_summary(summary))
+    output_path = save_eda_summary(summary, args.output)
+    print(f"EDA summary saved to {output_path}")
+
+
 def _split(processed):
     y = processed["Survived"]
     X = processed.drop(columns=["Survived"])
@@ -129,6 +142,17 @@ def main() -> None:
     p_compare = subparsers.add_parser("compare", help="Compare all models")
     p_compare.add_argument(
         "--train", default="data/raw/train.csv", help="Path to training CSV"
+    )
+
+    # eda
+    p_eda = subparsers.add_parser("eda", help="Generate EDA summary report")
+    p_eda.add_argument(
+        "--train", default="data/raw/train.csv", help="Path to training CSV"
+    )
+    p_eda.add_argument(
+        "--output",
+        default="artifacts/eda_summary.txt",
+        help="Path to output EDA summary report",
     )
 
     # train_best
@@ -169,6 +193,8 @@ def main() -> None:
 
     if args.command == "compare":
         cmd_compare(args)
+    elif args.command == "eda":
+        cmd_eda(args)
     elif args.command in {"train", "train_best"}:
         cmd_train(args)
     elif args.command == "train_all":

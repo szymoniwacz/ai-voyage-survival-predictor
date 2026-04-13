@@ -15,7 +15,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 import cli
-from cli import _split, cmd_compare, cmd_train, cmd_train_all, cmd_predict
+from cli import _split, cmd_compare, cmd_train, cmd_train_all, cmd_predict, cmd_eda
 
 
 # ---------------------------------------------------------------------------
@@ -220,6 +220,37 @@ def test_cmd_predict_missing_model_prints_error_and_exits(
 
 
 # ---------------------------------------------------------------------------
+# cmd_eda
+# ---------------------------------------------------------------------------
+
+
+@patch("cli.save_eda_summary")
+@patch("cli.format_eda_summary", return_value="EDA Summary\nRows: 2\n")
+@patch("cli.build_eda_summary", return_value={"row_count": 2, "column_count": 2})
+@patch("cli.load_data", return_value=pd.DataFrame({"Survived": [0, 1]}))
+def test_cmd_eda_builds_and_saves_summary(
+    mock_load, mock_build, mock_format, mock_save, capsys
+):
+    mock_save.return_value = "artifacts/eda_summary.txt"
+    args = argparse.Namespace(
+        train="data/raw/train.csv", output="artifacts/eda_summary.txt"
+    )
+
+    cmd_eda(args)
+
+    mock_load.assert_called_once_with("data/raw/train.csv", data_dir=".")
+    mock_build.assert_called_once()
+    mock_format.assert_called_once_with({"row_count": 2, "column_count": 2})
+    mock_save.assert_called_once_with(
+        {"row_count": 2, "column_count": 2}, "artifacts/eda_summary.txt"
+    )
+    out = capsys.readouterr().out
+    assert "EDA Summary" in out
+    assert "Rows: 2" in out
+    assert "EDA summary saved to artifacts/eda_summary.txt" in out
+
+
+# ---------------------------------------------------------------------------
 # main() – argument parsing
 # ---------------------------------------------------------------------------
 
@@ -241,6 +272,19 @@ def test_main_routes_compare(monkeypatch):
         cli.main()
 
     assert called.get("cmd") == "compare"
+
+
+def test_main_routes_eda(monkeypatch):
+    called = {}
+
+    def fake_eda(args):
+        called["cmd"] = "eda"
+
+    monkeypatch.setattr(cli, "cmd_eda", fake_eda)
+    with patch("sys.argv", ["cli.py", "eda", "--train", "data/raw/train.csv"]):
+        cli.main()
+
+    assert called.get("cmd") == "eda"
 
 
 def test_main_routes_train(monkeypatch):

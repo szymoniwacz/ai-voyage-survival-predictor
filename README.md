@@ -35,7 +35,7 @@ Predict Titanic passenger survival using robust ML pipelines, real-world data pr
     pip install -r requirements.txt
     ```
 2. Data files are already present in `data/raw/`.
-3. Run model comparison, training, and prediction from the CLI.
+3. Run EDA, model comparison, training, and prediction from the CLI.
 
 ---
 
@@ -44,12 +44,14 @@ Predict Titanic passenger survival using robust ML pipelines, real-world data pr
 All main operations are available via the CLI:
 
 ```bash
-python src/cli.py compare --train data/raw/train.csv
+python src/cli.py eda        --train data/raw/train.csv
+python src/cli.py compare    --train data/raw/train.csv
 python src/cli.py train_best --train data/raw/train.csv
 python src/cli.py train_all  --train data/raw/train.csv
 python src/cli.py predict    --train data/raw/train.csv --test data/raw/test.csv --model gradient_boosting
 ```
 
+- `eda`: Generate a compact EDA summary report and save it to `artifacts/eda_summary.txt`.
 - `compare`: Compare all models and print cross-validation results.
 - `train_best`: Evaluate all models, train the best (by ROC-AUC), and save it to `artifacts/`.
 - `train_all`: Train and save all supported models to `artifacts/`.
@@ -57,6 +59,7 @@ python src/cli.py predict    --train data/raw/train.csv --test data/raw/test.csv
 - `predict`: Load a saved model and predict on test data, saving predictions to `artifacts/predictions.csv`.
 
 Notes:
+- `eda --output <path>` lets you change where the summary report is saved.
 - `predict --model <name>` must match an existing artifact file: `artifacts/<name>.pkl`.
 - The best model can change between runs; check training output before selecting `--model`.
 
