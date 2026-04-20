@@ -1,5 +1,6 @@
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.base import clone
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -17,7 +18,9 @@ MODEL_CONFIGS: dict[str, Pipeline] = {
                 LogisticRegression(
                     max_iter=1000,
                     random_state=42,
-                    solver="lbfgs",
+                    # liblinear avoids scipy/lbfgs crashes on some Python builds
+                    # while remaining suitable for binary classification here.
+                    solver="liblinear",
                     C=1.0,
                 ),
             ),
@@ -60,7 +63,7 @@ def get_model(name: str) -> Pipeline:
         raise ValueError(
             f"Unknown model '{name}'. Available: {list(MODEL_CONFIGS.keys())}"
         )
-    return MODEL_CONFIGS[name]
+    return clone(MODEL_CONFIGS[name])
 
 
 def available_models() -> list[str]:
