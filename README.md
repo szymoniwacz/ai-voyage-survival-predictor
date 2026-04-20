@@ -57,6 +57,7 @@ python src/cli.py predict    --train data/raw/train.csv --test data/raw/test.csv
 - `train_all`: Train and save all supported models to `artifacts/`.
 - `train`: Alias for `train_best` (backward compatibility).
 - `predict`: Load a saved model and predict on test data, saving predictions to `artifacts/predictions.csv`.
+  The command also prints a short prediction summary in the console (survived vs did not survive counts).
 
 Notes:
 - `eda --output <path>` lets you change where the summary report is saved.

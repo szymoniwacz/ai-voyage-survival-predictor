@@ -147,7 +147,7 @@ def test_cmd_train_all_calls_train_all_models(
 @patch("cli.preprocess")
 @patch("cli.load_data")
 def test_cmd_predict_saves_predictions_csv(
-    mock_load, mock_preprocess, mock_load_model, mock_predict, tmp_path, monkeypatch
+    mock_load, mock_preprocess, mock_load_model, mock_predict, tmp_path, monkeypatch, capsys
 ):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "artifacts").mkdir()
@@ -181,12 +181,14 @@ def test_cmd_predict_saves_predictions_csv(
         model="random_forest",
     )
     cmd_predict(args)
+    out = capsys.readouterr().out
 
     output_csv = tmp_path / "artifacts" / "predictions.csv"
     assert output_csv.exists()
     result = pd.read_csv(output_csv)
     assert list(result.columns) == ["PassengerId", "Survived"]
     assert len(result) == 2
+    assert "Prediction summary: 1 survived, 1 did not survive (total: 2)" in out
 
 
 @patch("cli.predict", return_value=np.array([0, 1]))

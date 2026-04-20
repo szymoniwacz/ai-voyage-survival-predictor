@@ -109,6 +109,16 @@ def cmd_predict(args: argparse.Namespace) -> None:
     output = pd.DataFrame(
         {"PassengerId": test_df["PassengerId"], "Survived": predictions}
     )
+    survivors_count = int(output["Survived"].sum())
+    total_count = len(output)
+    non_survivors_count = total_count - survivors_count
+
+    print(
+        "Prediction summary: "
+        f"{survivors_count} survived, {non_survivors_count} did not survive "
+        f"(total: {total_count})"
+    )
+
     output_path = Path("artifacts") / "predictions.csv"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output.to_csv(output_path, index=False)
