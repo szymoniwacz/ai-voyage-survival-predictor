@@ -306,6 +306,6 @@ def test_format_fold_stability_table_shows_degraded_folds():
 
     table = format_fold_stability_table(baseline, engineered)
     assert "random_forest" in table
-    assert "1 / 3" in table  # improved
-    assert "2 / 3" in table  # degraded
+    assert "1/3" in table  # improved
+    assert "2/3" in table  # degraded
     assert "-0.02" in table  # worst fold delta shows negative

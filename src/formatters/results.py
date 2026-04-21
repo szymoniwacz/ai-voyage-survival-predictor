@@ -1,22 +1,26 @@
-"""Formatting helpers for trainer results."""
+"""Formatting helpers for trainer results.
+
+Domain logic only — visual layout is delegated to formatters.table.render_table.
+"""
 
 from __future__ import annotations
+
+from formatters.table import render_table
 
 
 def format_comparison_table(results: dict[str, dict]) -> str:
     """Return a plain-text table summarising model comparison results."""
-    header = f"{'Model':<25} {'Accuracy':>10} {'F1':>10} {'ROC-AUC':>10}"
-    separator = "-" * len(header)
-    rows = [header, separator]
-    for model_name, metrics in results.items():
-        row = (
-            f"{model_name:<25} "
-            f"{metrics['accuracy_mean']:.4f}±{metrics['accuracy_std']:.4f}  "
-            f"{metrics['f1_mean']:.4f}±{metrics['f1_std']:.4f}  "
-            f"{metrics['roc_auc_mean']:.4f}±{metrics['roc_auc_std']:.4f}"
-        )
-        rows.append(row)
-    return "\n".join(rows)
+    headers = ["Model", "Accuracy", "F1", "ROC-AUC"]
+    rows = [
+        [
+            model_name,
+            f"{m['accuracy_mean']:.4f}±{m['accuracy_std']:.4f}",
+            f"{m['f1_mean']:.4f}±{m['f1_std']:.4f}",
+            f"{m['roc_auc_mean']:.4f}±{m['roc_auc_std']:.4f}",
+        ]
+        for model_name, m in results.items()
+    ]
+    return render_table(headers, rows)
 
 
 def format_best_model(name: str, metrics: dict) -> str:
@@ -32,31 +36,24 @@ def format_feature_set_delta_table(
     baseline_results: dict[str, dict], engineered_results: dict[str, dict]
 ) -> str:
     """Return a table with metric deltas (engineered - baseline) per model."""
-    header = f"{'Model':<25} {'Δ Accuracy':>10} {'Δ F1':>10} {'Δ ROC-AUC':>12}"
-    separator = "-" * len(header)
-    rows = [
-        header,
-        separator,
-    ]
-
-    model_names = sorted(set(baseline_results) & set(engineered_results))
-    for model_name in model_names:
+    headers = ["Model", "Δ Accuracy", "Δ F1", "Δ ROC-AUC"]
+    rows = []
+    for model_name in sorted(set(baseline_results) & set(engineered_results)):
         base = baseline_results[model_name]
         eng = engineered_results[model_name]
-
-        delta_accuracy = eng["accuracy_mean"] - base["accuracy_mean"]
-        delta_f1 = eng["f1_mean"] - base["f1_mean"]
-        delta_roc_auc = eng["roc_auc_mean"] - base["roc_auc_mean"]
-
         rows.append(
-            f"{model_name:<25} "
-            f"{delta_accuracy:+.4f} "
-            f"{delta_f1:+.4f} "
-            f"{delta_roc_auc:+.4f}"
+            [
+                model_name,
+                f"{eng['accuracy_mean'] - base['accuracy_mean']:+.4f}",
+                f"{eng['f1_mean'] - base['f1_mean']:+.4f}",
+                f"{eng['roc_auc_mean'] - base['roc_auc_mean']:+.4f}",
+            ]
         )
-
-    rows.append("Note: Positive deltas mean engineered features performed better.")
-    return "\n".join(rows)
+    return render_table(
+        headers,
+        rows,
+        footer="Note: Positive deltas mean engineered features performed better.",
+    )
 
 
 def format_fold_stability_table(
@@ -69,27 +66,24 @@ def format_fold_stability_table(
     the score, and the worst single-fold delta.
     """
     n_folds = len(next(iter(baseline_folds.values())))
-    header = f"{'Model':<25} {'Improved':>9} {'Degraded':>9} {'Worst fold Δ':>13}"
-    separator = "-" * len(header)
-    rows = [
-        f"Fold-level ROC-AUC stability ({n_folds} folds, engineered vs baseline)",
-        header,
-        separator,
-    ]
-
-    model_names = sorted(set(baseline_folds) & set(engineered_folds))
-    for model_name in model_names:
+    headers = ["Model", "Improved", "Degraded", "Worst fold Δ"]
+    rows = []
+    for model_name in sorted(set(baseline_folds) & set(engineered_folds)):
         base = baseline_folds[model_name]
         eng = engineered_folds[model_name]
         deltas = [e - b for e, b in zip(eng, base)]
         improved = sum(1 for d in deltas if d >= 0)
         degraded = n_folds - improved
-        worst_delta = min(deltas)
         rows.append(
-            f"{model_name:<25} "
-            f"{improved:>4} / {n_folds:<3} "
-            f"{degraded:>4} / {n_folds:<3} "
-            f"{worst_delta:>+.4f}"
+            [
+                model_name,
+                f"{improved}/{n_folds}",
+                f"{degraded}/{n_folds}",
+                f"{min(deltas):+.4f}",
+            ]
         )
-
-    return "\n".join(rows)
+    return render_table(
+        headers,
+        rows,
+        title=f"Fold-level ROC-AUC stability ({n_folds} folds, engineered vs baseline)",
+    )
