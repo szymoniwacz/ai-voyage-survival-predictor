@@ -49,6 +49,21 @@ def compare_models(df: pd.DataFrame) -> dict[str, dict]:
     return {name: evaluate_model(name, X, y) for name in available_models()}
 
 
+def compare_models_folds(df: pd.DataFrame) -> dict[str, list[float]]:
+    """Evaluate all models and return per-fold ROC-AUC scores.
+
+    Returns a mapping: model_name -> list of per-fold roc_auc scores.
+    """
+    X, y = _split_features_target(df)
+    cv = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
+    result = {}
+    for name in available_models():
+        pipeline = get_model(name)
+        scores = cross_validate(pipeline, X, y, cv=cv, scoring=["roc_auc"])
+        result[name] = scores["test_roc_auc"].tolist()
+    return result
+
+
 def _select_best_model_name(df: pd.DataFrame) -> str:
     """Select best model by ROC-AUC mean from cross-validation comparison."""
     comparison = compare_models(df)

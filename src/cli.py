@@ -31,6 +31,7 @@ from preprocessor import preprocess, preprocess_baseline
 from eda import build_eda_summary, format_eda_summary, save_eda_summary
 from trainer import (
     compare_models,
+    compare_models_folds,
     train_best_model,
     train_all_models,
     load_model,
@@ -42,6 +43,7 @@ from formatters.results import (
     format_comparison_table,
     format_best_model,
     format_feature_set_delta_table,
+    format_fold_stability_table,
 )
 
 
@@ -53,29 +55,32 @@ def cmd_compare(args: argparse.Namespace) -> None:
     print(f"Loading data from {args.train} …")
     df = load_data(args.train, data_dir=".")
 
-    def run_compare(feature_set: str) -> dict:
+    def run_compare(feature_set: str) -> tuple[dict, dict]:
         if feature_set == "baseline":
             prepared = preprocess_baseline(df)
         else:
             prepared = preprocess(df)
-        return compare_models(prepared)
+        return compare_models(prepared), compare_models_folds(prepared)
 
     if args.feature_set == "both":
         print("Running cross-validation for baseline features …\n")
-        baseline_results = run_compare("baseline")
+        baseline_results, baseline_folds = run_compare("baseline")
         print("Baseline features")
         print(format_comparison_table(baseline_results))
 
         print("\nRunning cross-validation for engineered features …\n")
-        engineered_results = run_compare("engineered")
+        engineered_results, engineered_folds = run_compare("engineered")
         print("Engineered features")
         print(format_comparison_table(engineered_results))
+
         print("\nEngineered vs Baseline (delta)")
         print(format_feature_set_delta_table(baseline_results, engineered_results))
+
+        print("\n" + format_fold_stability_table(baseline_folds, engineered_folds))
         return
 
     print(f"Running cross-validation for {args.feature_set} features …\n")
-    results = run_compare(args.feature_set)
+    results, _ = run_compare(args.feature_set)
     print(format_comparison_table(results))
 
 

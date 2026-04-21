@@ -295,3 +295,17 @@ def test_format_feature_set_delta_table_contains_deltas():
     assert "+0.0100" in table
     assert "+0.0200" in table
     assert "Winner" not in table
+
+
+def test_format_fold_stability_table_shows_degraded_folds():
+    from formatters.results import format_fold_stability_table
+
+    # 3 folds: engineered is worse in 2 of them
+    baseline = {"random_forest": [0.88, 0.90, 0.85]}
+    engineered = {"random_forest": [0.86, 0.92, 0.84]}
+
+    table = format_fold_stability_table(baseline, engineered)
+    assert "random_forest" in table
+    assert "1 / 3" in table  # improved
+    assert "2 / 3" in table  # degraded
+    assert "-0.02" in table  # worst fold delta shows negative

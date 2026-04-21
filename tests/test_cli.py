@@ -37,6 +37,7 @@ def test_split_returns_X_and_y():
 
 
 @patch("cli.format_comparison_table", return_value="TABLE")
+@patch("cli.compare_models_folds", return_value={"logistic_regression": [0.8, 0.85]})
 @patch(
     "cli.compare_models", return_value={"logistic_regression": {"roc_auc_mean": 0.8}}
 )
@@ -44,7 +45,13 @@ def test_split_returns_X_and_y():
 @patch("cli.preprocess_baseline", return_value=pd.DataFrame({"Survived": [0, 1]}))
 @patch("cli.load_data", return_value=pd.DataFrame({"a": [1]}))
 def test_cmd_compare_calls_compare_models(
-    mock_load, mock_preprocess_baseline, mock_preprocess, mock_compare, mock_fmt, capsys
+    mock_load,
+    mock_preprocess_baseline,
+    mock_preprocess,
+    mock_compare,
+    mock_folds,
+    mock_fmt,
+    capsys,
 ):
     args = argparse.Namespace(train="data/raw/train.csv", feature_set="engineered")
     cmd_compare(args)
@@ -55,6 +62,7 @@ def test_cmd_compare_calls_compare_models(
 
 
 @patch("cli.format_comparison_table", return_value="TABLE")
+@patch("cli.compare_models_folds", return_value={"logistic_regression": [0.8, 0.85]})
 @patch(
     "cli.compare_models", return_value={"logistic_regression": {"roc_auc_mean": 0.8}}
 )
@@ -62,7 +70,13 @@ def test_cmd_compare_calls_compare_models(
 @patch("cli.preprocess_baseline", return_value=pd.DataFrame({"Survived": [0, 1]}))
 @patch("cli.load_data", return_value=pd.DataFrame({"a": [1]}))
 def test_cmd_compare_baseline_uses_baseline_preprocessor(
-    mock_load, mock_preprocess_baseline, mock_preprocess, mock_compare, mock_fmt, capsys
+    mock_load,
+    mock_preprocess_baseline,
+    mock_preprocess,
+    mock_compare,
+    mock_folds,
+    mock_fmt,
+    capsys,
 ):
     args = argparse.Namespace(train="data/raw/train.csv", feature_set="baseline")
     cmd_compare(args)
@@ -75,6 +89,8 @@ def test_cmd_compare_baseline_uses_baseline_preprocessor(
 
 @patch("cli.format_comparison_table", return_value="TABLE")
 @patch("cli.format_feature_set_delta_table", return_value="DELTA")
+@patch("cli.format_fold_stability_table", return_value="STABILITY")
+@patch("cli.compare_models_folds", return_value={"logistic_regression": [0.85, 0.82]})
 @patch(
     "cli.compare_models", return_value={"logistic_regression": {"roc_auc_mean": 0.8}}
 )
@@ -86,6 +102,8 @@ def test_cmd_compare_both_runs_two_comparisons(
     mock_preprocess_baseline,
     mock_preprocess,
     mock_compare,
+    mock_folds,
+    mock_stability,
     mock_delta,
     mock_fmt,
     capsys,
@@ -93,14 +111,17 @@ def test_cmd_compare_both_runs_two_comparisons(
     args = argparse.Namespace(train="data/raw/train.csv", feature_set="both")
     cmd_compare(args)
     assert mock_compare.call_count == 2
+    assert mock_folds.call_count == 2
     mock_preprocess_baseline.assert_called_once()
     mock_preprocess.assert_called_once()
     mock_delta.assert_called_once()
+    mock_stability.assert_called_once()
     out = capsys.readouterr().out
     assert "Baseline features" in out
     assert "Engineered features" in out
     assert "Engineered vs Baseline (delta)" in out
     assert "DELTA" in out
+    assert "STABILITY" in out
 
 
 # ---------------------------------------------------------------------------

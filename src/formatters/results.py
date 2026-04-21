@@ -57,3 +57,39 @@ def format_feature_set_delta_table(
 
     rows.append("Note: Positive deltas mean engineered features performed better.")
     return "\n".join(rows)
+
+
+def format_fold_stability_table(
+    baseline_folds: dict[str, list[float]],
+    engineered_folds: dict[str, list[float]],
+) -> str:
+    """Return a per-fold ROC-AUC stability table (engineered vs baseline).
+
+    Shows for each model how many CV folds engineered improved or degraded
+    the score, and the worst single-fold delta.
+    """
+    n_folds = len(next(iter(baseline_folds.values())))
+    header = f"{'Model':<25} {'Improved':>9} {'Degraded':>9} {'Worst fold Δ':>13}"
+    separator = "-" * len(header)
+    rows = [
+        f"Fold-level ROC-AUC stability ({n_folds} folds, engineered vs baseline)",
+        header,
+        separator,
+    ]
+
+    model_names = sorted(set(baseline_folds) & set(engineered_folds))
+    for model_name in model_names:
+        base = baseline_folds[model_name]
+        eng = engineered_folds[model_name]
+        deltas = [e - b for e, b in zip(eng, base)]
+        improved = sum(1 for d in deltas if d >= 0)
+        degraded = n_folds - improved
+        worst_delta = min(deltas)
+        rows.append(
+            f"{model_name:<25} "
+            f"{improved:>4} / {n_folds:<3} "
+            f"{degraded:>4} / {n_folds:<3} "
+            f"{worst_delta:>+.4f}"
+        )
+
+    return "\n".join(rows)
