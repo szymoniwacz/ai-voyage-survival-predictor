@@ -45,6 +45,7 @@ from formatters.results import (
     format_feature_set_delta_table,
     format_fold_stability_table,
 )
+from formatters.charts import plot_comparison_charts
 
 
 def _prepare_feature_set(df: pd.DataFrame, feature_set: str) -> pd.DataFrame:
@@ -77,6 +78,10 @@ def cmd_compare(args: argparse.Namespace) -> None:
         print(format_feature_set_delta_table(baseline_results, engineered_results))
 
         print("\n" + format_fold_stability_table(baseline_folds, engineered_folds))
+
+        if getattr(args, "charts", False):
+            p1 = plot_comparison_charts(baseline_results, engineered_results)
+            print(f"\nChart saved to: {p1}")
         return
 
     print(f"Running cross-validation for {args.feature_set} features …\n")
@@ -215,6 +220,11 @@ def main() -> None:
         choices=["engineered", "baseline", "both"],
         default="engineered",
         help="Which features to compare models on",
+    )
+    p_compare.add_argument(
+        "--charts",
+        action="store_true",
+        help="Save comparison charts to artifacts/ (requires --feature-set both)",
     )
 
     # eda

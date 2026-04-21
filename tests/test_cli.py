@@ -124,6 +124,39 @@ def test_cmd_compare_both_runs_two_comparisons(
     assert "STABILITY" in out
 
 
+@patch("cli.plot_comparison_charts", return_value="artifacts/comparison_metrics.png")
+@patch("cli.format_comparison_table", return_value="TABLE")
+@patch("cli.format_feature_set_delta_table", return_value="DELTA")
+@patch("cli.format_fold_stability_table", return_value="STABILITY")
+@patch("cli.compare_models_folds", return_value={"logistic_regression": [0.85, 0.82]})
+@patch(
+    "cli.compare_models", return_value={"logistic_regression": {"roc_auc_mean": 0.8}}
+)
+@patch("cli.preprocess", return_value=pd.DataFrame({"Survived": [0, 1]}))
+@patch("cli.preprocess_baseline", return_value=pd.DataFrame({"Survived": [0, 1]}))
+@patch("cli.load_data", return_value=pd.DataFrame({"a": [1]}))
+def test_cmd_compare_both_with_charts_saves_charts(
+    mock_load,
+    mock_preprocess_baseline,
+    mock_preprocess,
+    mock_compare,
+    mock_folds,
+    mock_stability,
+    mock_delta,
+    mock_fmt,
+    mock_plot_comparison,
+    capsys,
+):
+    args = argparse.Namespace(
+        train="data/raw/train.csv", feature_set="both", charts=True
+    )
+    cmd_compare(args)
+    mock_plot_comparison.assert_called_once()
+    out = capsys.readouterr().out
+    assert "Chart saved to" in out
+    assert "comparison_metrics.png" in out
+
+
 # ---------------------------------------------------------------------------
 # cmd_train
 # ---------------------------------------------------------------------------
