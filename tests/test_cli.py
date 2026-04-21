@@ -41,15 +41,66 @@ def test_split_returns_X_and_y():
     "cli.compare_models", return_value={"logistic_regression": {"roc_auc_mean": 0.8}}
 )
 @patch("cli.preprocess", return_value=pd.DataFrame({"Survived": [0, 1]}))
+@patch("cli.preprocess_baseline", return_value=pd.DataFrame({"Survived": [0, 1]}))
 @patch("cli.load_data", return_value=pd.DataFrame({"a": [1]}))
 def test_cmd_compare_calls_compare_models(
-    mock_load, mock_preprocess, mock_compare, mock_fmt, capsys
+    mock_load, mock_preprocess_baseline, mock_preprocess, mock_compare, mock_fmt, capsys
 ):
-    args = argparse.Namespace(train="data/raw/train.csv")
+    args = argparse.Namespace(train="data/raw/train.csv", feature_set="engineered")
     cmd_compare(args)
     mock_compare.assert_called_once()
+    mock_preprocess.assert_called_once()
     out = capsys.readouterr().out
     assert "TABLE" in out
+
+
+@patch("cli.format_comparison_table", return_value="TABLE")
+@patch(
+    "cli.compare_models", return_value={"logistic_regression": {"roc_auc_mean": 0.8}}
+)
+@patch("cli.preprocess", return_value=pd.DataFrame({"Survived": [0, 1]}))
+@patch("cli.preprocess_baseline", return_value=pd.DataFrame({"Survived": [0, 1]}))
+@patch("cli.load_data", return_value=pd.DataFrame({"a": [1]}))
+def test_cmd_compare_baseline_uses_baseline_preprocessor(
+    mock_load, mock_preprocess_baseline, mock_preprocess, mock_compare, mock_fmt, capsys
+):
+    args = argparse.Namespace(train="data/raw/train.csv", feature_set="baseline")
+    cmd_compare(args)
+    mock_compare.assert_called_once()
+    mock_preprocess_baseline.assert_called_once()
+    mock_preprocess.assert_not_called()
+    out = capsys.readouterr().out
+    assert "TABLE" in out
+
+
+@patch("cli.format_comparison_table", return_value="TABLE")
+@patch("cli.format_feature_set_delta_table", return_value="DELTA")
+@patch(
+    "cli.compare_models", return_value={"logistic_regression": {"roc_auc_mean": 0.8}}
+)
+@patch("cli.preprocess", return_value=pd.DataFrame({"Survived": [0, 1]}))
+@patch("cli.preprocess_baseline", return_value=pd.DataFrame({"Survived": [0, 1]}))
+@patch("cli.load_data", return_value=pd.DataFrame({"a": [1]}))
+def test_cmd_compare_both_runs_two_comparisons(
+    mock_load,
+    mock_preprocess_baseline,
+    mock_preprocess,
+    mock_compare,
+    mock_delta,
+    mock_fmt,
+    capsys,
+):
+    args = argparse.Namespace(train="data/raw/train.csv", feature_set="both")
+    cmd_compare(args)
+    assert mock_compare.call_count == 2
+    mock_preprocess_baseline.assert_called_once()
+    mock_preprocess.assert_called_once()
+    mock_delta.assert_called_once()
+    out = capsys.readouterr().out
+    assert "Baseline features" in out
+    assert "Engineered features" in out
+    assert "Engineered vs Baseline (delta)" in out
+    assert "DELTA" in out
 
 
 # ---------------------------------------------------------------------------
@@ -91,11 +142,104 @@ def test_cmd_train_calls_train_best_model(
         }
     )
     mock_preprocess.return_value = processed
-    args = argparse.Namespace(train="data/raw/train.csv")
+    args = argparse.Namespace(train="data/raw/train.csv", feature_set="engineered")
     cmd_train(args)
     mock_train.assert_called_once()
     out = capsys.readouterr().out
     assert "TABLE" in out
+
+
+@patch("cli.train_best_model", return_value=("baseline_random_forest", MagicMock()))
+@patch("cli.format_best_model", return_value="BEST")
+@patch("cli.format_comparison_table", return_value="TABLE")
+@patch(
+    "cli.evaluate_model",
+    return_value={
+        "accuracy_mean": 0.8,
+        "accuracy_std": 0.01,
+        "f1_mean": 0.75,
+        "f1_std": 0.02,
+        "roc_auc_mean": 0.82,
+        "roc_auc_std": 0.01,
+    },
+)
+@patch("cli.available_models", return_value=["random_forest"])
+@patch("cli.preprocess")
+@patch("cli.preprocess_baseline")
+@patch("cli.load_data", return_value=pd.DataFrame({"a": [1]}))
+def test_cmd_train_baseline_uses_baseline_preprocessor_and_prefix(
+    mock_load,
+    mock_preprocess_baseline,
+    mock_preprocess,
+    mock_available,
+    mock_eval,
+    mock_fmt,
+    mock_best_fmt,
+    mock_train,
+    capsys,
+):
+    processed = pd.DataFrame({"Survived": [0, 1], "Age": [22.0, 38.0]})
+    mock_preprocess_baseline.return_value = processed
+    args = argparse.Namespace(train="data/raw/train.csv", feature_set="baseline")
+
+    cmd_train(args)
+
+    mock_preprocess_baseline.assert_called_once()
+    mock_preprocess.assert_not_called()
+    mock_train.assert_called_once_with(processed, model_name_prefix="baseline_")
+    out = capsys.readouterr().out
+    assert "Model saved to artifacts/baseline_random_forest.pkl" in out
+
+
+@patch(
+    "cli.train_best_model",
+    side_effect=[
+        ("baseline_random_forest", MagicMock()),
+        ("random_forest", MagicMock()),
+    ],
+)
+@patch("cli.format_best_model", return_value="BEST")
+@patch("cli.format_comparison_table", return_value="TABLE")
+@patch(
+    "cli.evaluate_model",
+    return_value={
+        "accuracy_mean": 0.8,
+        "accuracy_std": 0.01,
+        "f1_mean": 0.75,
+        "f1_std": 0.02,
+        "roc_auc_mean": 0.82,
+        "roc_auc_std": 0.01,
+    },
+)
+@patch("cli.available_models", return_value=["random_forest"])
+@patch("cli.preprocess")
+@patch("cli.preprocess_baseline")
+@patch("cli.load_data", return_value=pd.DataFrame({"a": [1]}))
+def test_cmd_train_both_runs_baseline_and_engineered(
+    mock_load,
+    mock_preprocess_baseline,
+    mock_preprocess,
+    mock_available,
+    mock_eval,
+    mock_fmt,
+    mock_best_fmt,
+    mock_train,
+    capsys,
+):
+    baseline_processed = pd.DataFrame({"Survived": [0, 1], "Age": [22.0, 38.0]})
+    engineered_processed = pd.DataFrame(
+        {"Survived": [0, 1], "Age": [22.0, 38.0], "Title": [0, 1]}
+    )
+    mock_preprocess_baseline.return_value = baseline_processed
+    mock_preprocess.return_value = engineered_processed
+    args = argparse.Namespace(train="data/raw/train.csv", feature_set="both")
+
+    cmd_train(args)
+
+    assert mock_train.call_count == 2
+    out = capsys.readouterr().out
+    assert "Evaluating models on baseline features" in out
+    assert "Evaluating models on engineered features" in out
 
 
 @patch("cli.train_all_models", return_value={"random_forest": MagicMock()})
@@ -130,7 +274,7 @@ def test_cmd_train_all_calls_train_all_models(
         }
     )
     mock_preprocess.return_value = processed
-    args = argparse.Namespace(train="data/raw/train.csv")
+    args = argparse.Namespace(train="data/raw/train.csv", feature_set="engineered")
     cmd_train_all(args)
     mock_train_all.assert_called_once()
     out = capsys.readouterr().out
@@ -147,7 +291,13 @@ def test_cmd_train_all_calls_train_all_models(
 @patch("cli.preprocess")
 @patch("cli.load_data")
 def test_cmd_predict_saves_predictions_csv(
-    mock_load, mock_preprocess, mock_load_model, mock_predict, tmp_path, monkeypatch, capsys
+    mock_load,
+    mock_preprocess,
+    mock_load_model,
+    mock_predict,
+    tmp_path,
+    monkeypatch,
+    capsys,
 ):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "artifacts").mkdir()
@@ -270,7 +420,17 @@ def test_main_routes_compare(monkeypatch):
         called["cmd"] = "compare"
 
     monkeypatch.setattr(cli, "cmd_compare", fake_compare)
-    with patch("sys.argv", ["cli.py", "compare", "--train", "data/raw/train.csv"]):
+    with patch(
+        "sys.argv",
+        [
+            "cli.py",
+            "compare",
+            "--train",
+            "data/raw/train.csv",
+            "--feature-set",
+            "baseline",
+        ],
+    ):
         cli.main()
 
     assert called.get("cmd") == "compare"

@@ -2,6 +2,7 @@ import pytest
 import pandas as pd
 
 from preprocessor import (
+    BASELINE_FEATURES,
     extract_title,
     normalize_title,
     fill_missing_age,
@@ -9,6 +10,7 @@ from preprocessor import (
     fill_missing_embarked,
     fill_missing_fare,
     preprocess,
+    preprocess_baseline,
     TITLE_ENCODE,
     DECK_ENCODE,
 )
@@ -348,6 +350,42 @@ def test_preprocess_does_not_modify_input():
     original = df.copy(deep=True)
     preprocess(df)
     pd.testing.assert_frame_equal(df, original)
+
+
+# ---------------------------------------------------------------------------
+# preprocess_baseline
+# ---------------------------------------------------------------------------
+
+
+def test_preprocess_baseline_keeps_only_baseline_features_and_target():
+    df = _minimal_row()
+    df["Survived"] = [1]
+    df["Name"] = ["Smith, Mr. John"]
+    result = preprocess_baseline(df)
+
+    expected_cols = BASELINE_FEATURES + ["Survived"]
+    assert list(result.columns) == expected_cols
+
+
+def test_preprocess_baseline_applies_basic_encoding_and_imputation():
+    df = pd.DataFrame(
+        {
+            "Pclass": [1, 3],
+            "Sex": ["male", "female"],
+            "Age": [22.0, None],
+            "SibSp": [1, 0],
+            "Parch": [0, 0],
+            "Fare": [7.25, None],
+            "Embarked": ["S", None],
+            "Survived": [0, 1],
+        }
+    )
+
+    result = preprocess_baseline(df)
+
+    assert set(result["Sex"].unique()) <= {0, 1}
+    assert set(result["Embarked"].unique()) <= {0, 1, 2}
+    assert result.isnull().sum().sum() == 0
 
 
 # ---------------------------------------------------------------------------

@@ -55,23 +55,32 @@ def _select_best_model_name(df: pd.DataFrame) -> str:
     return max(comparison, key=lambda n: comparison[n]["roc_auc_mean"])
 
 
-def train_best_model(df: pd.DataFrame) -> tuple[str, object]:
+def _artifact_model_name(name: str, model_name_prefix: str) -> str:
+    return f"{model_name_prefix}{name}" if model_name_prefix else name
+
+
+def train_best_model(
+    df: pd.DataFrame, model_name_prefix: str = ""
+) -> tuple[str, object]:
     """Train the best model (by ROC-AUC) on the full dataset and save it.
 
-    Returns the best model name and the fitted pipeline.
+    Returns the saved model artifact name and the fitted pipeline.
     """
     best_name = _select_best_model_name(df)
     X, y = _split_features_target(df)
     best_pipeline = get_model(best_name)
     best_pipeline.fit(X, y)
-    _save_model(best_name, best_pipeline)
-    return best_name, best_pipeline
+    saved_name = _artifact_model_name(best_name, model_name_prefix)
+    _save_model(saved_name, best_pipeline)
+    return saved_name, best_pipeline
 
 
-def train_all_models(df: pd.DataFrame) -> dict[str, object]:
+def train_all_models(
+    df: pd.DataFrame, model_name_prefix: str = ""
+) -> dict[str, object]:
     """Train all available models on the full dataset and save each artifact.
 
-    Returns a mapping: model_name -> fitted pipeline.
+    Returns a mapping: saved_model_name -> fitted pipeline.
     """
     X, y = _split_features_target(df)
     trained_models: dict[str, object] = {}
@@ -79,8 +88,9 @@ def train_all_models(df: pd.DataFrame) -> dict[str, object]:
     for model_name in available_models():
         pipeline = get_model(model_name)
         pipeline.fit(X, y)
-        _save_model(model_name, pipeline)
-        trained_models[model_name] = pipeline
+        saved_name = _artifact_model_name(model_name, model_name_prefix)
+        _save_model(saved_name, pipeline)
+        trained_models[saved_name] = pipeline
 
     return trained_models
 

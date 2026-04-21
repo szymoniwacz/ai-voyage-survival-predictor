@@ -44,32 +44,67 @@ Predict Titanic passenger survival using robust ML pipelines, real-world data pr
 All main operations are available via the CLI:
 
 ```bash
-python src/cli.py eda        --train data/raw/train.csv
-python src/cli.py compare    --train data/raw/train.csv
-python src/cli.py train_best --train data/raw/train.csv
-python src/cli.py train_all  --train data/raw/train.csv
-python src/cli.py predict    --train data/raw/train.csv --test data/raw/test.csv --model gradient_boosting
+python -m src.cli eda        --train data/raw/train.csv
+python -m src.cli compare    --train data/raw/train.csv --feature-set both
+python -m src.cli train_best --train data/raw/train.csv --feature-set engineered
+python -m src.cli train_all  --train data/raw/train.csv --feature-set baseline
+python -m src.cli predict    --train data/raw/train.csv --test data/raw/test.csv --model gradient_boosting
 ```
 
 - `eda`: Generate a compact EDA summary report and save it to `artifacts/eda_summary.txt`.
 - `compare`: Compare all models and print cross-validation results.
+  Supports `--feature-set engineered|baseline|both`.
+  With `--feature-set both`, it also prints a delta table (engineered - baseline) in the console.
 - `train_best`: Evaluate all models, train the best (by ROC-AUC), and save it to `artifacts/`.
+  Supports `--feature-set engineered|baseline|both`.
 - `train_all`: Train and save all supported models to `artifacts/`.
+  Supports `--feature-set engineered|baseline|both`.
 - `train`: Alias for `train_best` (backward compatibility).
 - `predict`: Load a saved model and predict on test data, saving predictions to `artifacts/predictions.csv`.
   The command also prints a short prediction summary in the console (survived vs did not survive counts).
 
 Notes:
 - `eda --output <path>` lets you change where the summary report is saved.
+- Baseline model artifacts use `baseline_` prefix (e.g. `baseline_random_forest.pkl`).
 - `predict --model <name>` must match an existing artifact file: `artifacts/<name>.pkl`.
 - The best model can change between runs; check training output before selecting `--model`.
 
+### Baseline vs Engineered: exact workflow
+
+Goal: train all models for both feature sets and compare their quality.
+
+1. Train and save all models for both feature sets:
+```bash
+python -m src.cli train_all --train data/raw/train.csv --feature-set both
+```
+
+This creates two groups of artifacts:
+- baseline models (prefixed): `baseline_logistic_regression.pkl`, `baseline_random_forest.pkl`, `baseline_gradient_boosting.pkl`
+- engineered models (regular names): `logistic_regression.pkl`, `random_forest.pkl`, `gradient_boosting.pkl`
+
+2. Compare model quality for both feature sets in one run:
+```bash
+python -m src.cli compare --train data/raw/train.csv --feature-set both
+```
+
+You will see two tables:
+- Baseline features
+- Engineered features
+
+This is the command to compare how much feature engineering helped.
+
+What `both` means:
+- It runs two separate passes:
+  - one pass on `baseline` features,
+  - one pass on `engineered` features.
+- It does **not** mix both feature sets in a single training run.
+
 Recommended order:
 ```bash
-python src/cli.py eda        --train data/raw/train.csv
-python src/cli.py compare    --train data/raw/train.csv
-python src/cli.py train_best --train data/raw/train.csv
-python src/cli.py predict    --train data/raw/train.csv --test data/raw/test.csv --model <best_model_name>
+python -m src.cli eda        --train data/raw/train.csv
+python -m src.cli compare    --train data/raw/train.csv --feature-set both
+python -m src.cli train_best --train data/raw/train.csv --feature-set engineered
+python -m src.cli predict    --train data/raw/train.csv --test data/raw/test.csv --model <best_model_name>
 ```
 
 ---
@@ -148,4 +183,4 @@ PYTHONPATH=src pytest tests/ -v
 - All code is modular, DRY, and KISS.
 - No business logic in CLI.
 - Feature engineering and model selection are fully reproducible.
-- See `agents.md` for architecture and style rules.
+- See `.claude/agents/` for agent roles and workflow guidance.

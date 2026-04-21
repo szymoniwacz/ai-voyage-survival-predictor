@@ -4,17 +4,17 @@ Commands:
     train_best — compare all models, pick the best one, save it to artifacts/
     train_all  — train all models and save each to artifacts/
     train      — alias for train_best (backward compatibility)
-    compare.   — compare all models and print a results table (no saving)
+    compare    — compare all models and print a results table (no saving)
     eda        — generate a compact EDA summary and save it to artifacts/
     predict    — load a saved model and predict on test.csv
 
 Usage:
-    python src/cli.py train_best --train data/raw/train.csv
-    python src/cli.py train_all  --train data/raw/train.csv
-    python src/cli.py train      --train data/raw/train.csv
-    python src/cli.py compare.   --train data/raw/train.csv
-    python src/cli.py eda        --train data/raw/train.csv
-  python src/cli.py predict --train data/raw/train.csv --test data/raw/test.csv --model random_forest
+    python -m src.cli train_best --train data/raw/train.csv
+    python -m src.cli train_all  --train data/raw/train.csv
+    python -m src.cli train      --train data/raw/train.csv
+    python -m src.cli compare    --train data/raw/train.csv
+    python -m src.cli eda        --train data/raw/train.csv
+    python -m src.cli predict    --train data/raw/train.csv --test data/raw/test.csv --model random_forest
 """
 
 import argparse
@@ -27,7 +27,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).parent))
 
 from data_loader import load_data
-from preprocessor import preprocess
+from preprocessor import preprocess, preprocess_baseline
 from eda import build_eda_summary, format_eda_summary, save_eda_summary
 from trainer import (
     compare_models,
@@ -38,50 +38,102 @@ from trainer import (
     evaluate_model,
 )
 from model_factory import available_models
-from formatters.results import format_comparison_table, format_best_model
+from formatters.results import (
+    format_comparison_table,
+    format_best_model,
+    format_feature_set_delta_table,
+)
+
+
+def _prepare_feature_set(df: pd.DataFrame, feature_set: str) -> pd.DataFrame:
+    return preprocess_baseline(df) if feature_set == "baseline" else preprocess(df)
 
 
 def cmd_compare(args: argparse.Namespace) -> None:
     print(f"Loading data from {args.train} …")
     df = load_data(args.train, data_dir=".")
-    processed = preprocess(df)
 
-    print("Running cross-validation for all models …\n")
-    results = compare_models(processed)
+    def run_compare(feature_set: str) -> dict:
+        if feature_set == "baseline":
+            prepared = preprocess_baseline(df)
+        else:
+            prepared = preprocess(df)
+        return compare_models(prepared)
+
+    if args.feature_set == "both":
+        print("Running cross-validation for baseline features …\n")
+        baseline_results = run_compare("baseline")
+        print("Baseline features")
+        print(format_comparison_table(baseline_results))
+
+        print("\nRunning cross-validation for engineered features …\n")
+        engineered_results = run_compare("engineered")
+        print("Engineered features")
+        print(format_comparison_table(engineered_results))
+        print("\nEngineered vs Baseline (delta)")
+        print(format_feature_set_delta_table(baseline_results, engineered_results))
+        return
+
+    print(f"Running cross-validation for {args.feature_set} features …\n")
+    results = run_compare(args.feature_set)
     print(format_comparison_table(results))
 
 
 def cmd_train(args: argparse.Namespace) -> None:
     print(f"Loading data from {args.train} …")
     df = load_data(args.train, data_dir=".")
-    processed = preprocess(df)
+    feature_set = getattr(args, "feature_set", "engineered")
 
-    print("Evaluating models …")
-    X, y = _split(processed)
-    results = {name: evaluate_model(name, X, y) for name in available_models()}
-    print(format_comparison_table(results))
+    def run_train_best(selected_set: str) -> None:
+        processed = _prepare_feature_set(df, selected_set)
 
-    best_name = max(results, key=lambda n: results[n]["roc_auc_mean"])
-    print(f"\nTraining best model ({best_name}) on full dataset …")
-    best_name, _ = train_best_model(processed)
-    print(f"Model saved to artifacts/{best_name}.pkl")
-    print(format_best_model(best_name, results[best_name]))
+        print(f"Evaluating models on {selected_set} features …")
+        X, y = _split(processed)
+        results = {name: evaluate_model(name, X, y) for name in available_models()}
+        print(format_comparison_table(results))
+
+        best_name = max(results, key=lambda n: results[n]["roc_auc_mean"])
+        model_prefix = "baseline_" if selected_set == "baseline" else ""
+        print(f"\nTraining best model ({best_name}) on full dataset …")
+        saved_name, _ = train_best_model(processed, model_name_prefix=model_prefix)
+        print(f"Model saved to artifacts/{saved_name}.pkl")
+        print(format_best_model(best_name, results[best_name]))
+
+    if feature_set == "both":
+        run_train_best("baseline")
+        print("\n" + "-" * 58 + "\n")
+        run_train_best("engineered")
+        return
+
+    run_train_best(feature_set)
 
 
 def cmd_train_all(args: argparse.Namespace) -> None:
     print(f"Loading data from {args.train} …")
     df = load_data(args.train, data_dir=".")
-    processed = preprocess(df)
+    feature_set = getattr(args, "feature_set", "engineered")
 
-    print("Evaluating models …")
-    X, y = _split(processed)
-    results = {name: evaluate_model(name, X, y) for name in available_models()}
-    print(format_comparison_table(results))
+    def run_train_all(selected_set: str) -> None:
+        processed = _prepare_feature_set(df, selected_set)
 
-    print("\nTraining all models on full dataset …")
-    trained = train_all_models(processed)
-    for model_name in trained:
-        print(f"Model saved to artifacts/{model_name}.pkl")
+        print(f"Evaluating models on {selected_set} features …")
+        X, y = _split(processed)
+        results = {name: evaluate_model(name, X, y) for name in available_models()}
+        print(format_comparison_table(results))
+
+        model_prefix = "baseline_" if selected_set == "baseline" else ""
+        print("\nTraining all models on full dataset …")
+        trained = train_all_models(processed, model_name_prefix=model_prefix)
+        for model_name in trained:
+            print(f"Model saved to artifacts/{model_name}.pkl")
+
+    if feature_set == "both":
+        run_train_all("baseline")
+        print("\n" + "-" * 58 + "\n")
+        run_train_all("engineered")
+        return
+
+    run_train_all(feature_set)
 
 
 def cmd_predict(args: argparse.Namespace) -> None:
@@ -153,6 +205,12 @@ def main() -> None:
     p_compare.add_argument(
         "--train", default="data/raw/train.csv", help="Path to training CSV"
     )
+    p_compare.add_argument(
+        "--feature-set",
+        choices=["engineered", "baseline", "both"],
+        default="engineered",
+        help="Which features to compare models on",
+    )
 
     # eda
     p_eda = subparsers.add_parser("eda", help="Generate EDA summary report")
@@ -172,11 +230,23 @@ def main() -> None:
     p_train_best.add_argument(
         "--train", default="data/raw/train.csv", help="Path to training CSV"
     )
+    p_train_best.add_argument(
+        "--feature-set",
+        choices=["engineered", "baseline", "both"],
+        default="engineered",
+        help="Which features to use for training",
+    )
 
     # train_all
     p_train_all = subparsers.add_parser("train_all", help="Train and save all models")
     p_train_all.add_argument(
         "--train", default="data/raw/train.csv", help="Path to training CSV"
+    )
+    p_train_all.add_argument(
+        "--feature-set",
+        choices=["engineered", "baseline", "both"],
+        default="engineered",
+        help="Which features to use for training",
     )
 
     # train (alias for train_best)
@@ -185,6 +255,12 @@ def main() -> None:
     )
     p_train_alias.add_argument(
         "--train", default="data/raw/train.csv", help="Path to training CSV"
+    )
+    p_train_alias.add_argument(
+        "--feature-set",
+        choices=["engineered", "baseline", "both"],
+        default="engineered",
+        help="Which features to use for training",
     )
 
     # predict

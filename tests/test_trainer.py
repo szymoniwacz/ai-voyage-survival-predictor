@@ -189,6 +189,32 @@ def test_train_all_models_saves_all_pkls(synthetic_df, tmp_path, monkeypatch):
         assert (tmp_path / f"{model_name}.pkl").exists()
 
 
+def test_train_best_model_with_prefix_saves_prefixed_artifact(
+    synthetic_df, tmp_path, monkeypatch
+):
+    import trainer as trainer_module
+
+    monkeypatch.setattr(trainer_module, "ARTIFACTS_DIR", tmp_path)
+
+    saved_name, _ = train_best_model(synthetic_df, model_name_prefix="baseline_")
+    assert saved_name.startswith("baseline_")
+    assert (tmp_path / f"{saved_name}.pkl").exists()
+
+
+def test_train_all_models_with_prefix_saves_prefixed_artifacts(
+    synthetic_df, tmp_path, monkeypatch
+):
+    import trainer as trainer_module
+
+    monkeypatch.setattr(trainer_module, "ARTIFACTS_DIR", tmp_path)
+
+    trained = train_all_models(synthetic_df, model_name_prefix="baseline_")
+    assert len(trained) == len(available_models())
+    for saved_name in trained:
+        assert saved_name.startswith("baseline_")
+        assert (tmp_path / f"{saved_name}.pkl").exists()
+
+
 # ---------------------------------------------------------------------------
 # trainer – predict
 # ---------------------------------------------------------------------------
@@ -244,3 +270,28 @@ def test_format_best_model_includes_name():
     text = format_best_model("random_forest", metrics)
     assert "random_forest" in text
     assert "0.8800" in text
+
+
+def test_format_feature_set_delta_table_contains_deltas():
+    from formatters.results import format_feature_set_delta_table
+
+    baseline = {
+        "random_forest": {
+            "accuracy_mean": 0.83,
+            "f1_mean": 0.76,
+            "roc_auc_mean": 0.87,
+        }
+    }
+    engineered = {
+        "random_forest": {
+            "accuracy_mean": 0.84,
+            "f1_mean": 0.78,
+            "roc_auc_mean": 0.89,
+        }
+    }
+
+    table = format_feature_set_delta_table(baseline, engineered)
+    assert "random_forest" in table
+    assert "+0.0100" in table
+    assert "+0.0200" in table
+    assert "Winner" not in table

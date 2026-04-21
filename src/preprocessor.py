@@ -27,6 +27,9 @@ DECK_ENCODE = {
 }
 
 
+BASELINE_FEATURES = ["Pclass", "Sex", "Age", "SibSp", "Parch", "Fare", "Embarked"]
+
+
 def extract_title(name):
     match = re.search(r",\s*([^\.]+)\.", name)
     if match:
@@ -158,6 +161,36 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
         errors="ignore",
         inplace=True,
     )
+
+    return data
+
+
+def preprocess_baseline(df: pd.DataFrame) -> pd.DataFrame:
+    """Prepare a minimal baseline feature set for model comparison.
+
+    Baseline keeps only original core columns (plus target when available)
+    with simple imputations/encodings so models can run without NaNs.
+    """
+    data = df.copy()
+
+    selected = [c for c in BASELINE_FEATURES if c in data.columns]
+    if "Survived" in data.columns:
+        selected.append("Survived")
+    data = data[selected].copy()
+
+    if "Sex" in data.columns:
+        if data["Sex"].isnull().any():
+            data["Sex"] = data["Sex"].fillna(data["Sex"].mode()[0])
+        data["Sex"] = data["Sex"].map({"male": 0, "female": 1})
+
+    if "Embarked" in data.columns:
+        if data["Embarked"].isnull().any():
+            data["Embarked"] = data["Embarked"].fillna(data["Embarked"].mode()[0])
+        data["Embarked"] = data["Embarked"].map({"S": 0, "C": 1, "Q": 2})
+
+    for col in ["Age", "Fare", "SibSp", "Parch", "Pclass"]:
+        if col in data.columns and data[col].isnull().any():
+            data[col] = data[col].fillna(data[col].median())
 
     return data
 
