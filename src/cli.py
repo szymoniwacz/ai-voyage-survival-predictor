@@ -79,9 +79,9 @@ def cmd_compare(args: argparse.Namespace) -> None:
 
         print("\n" + format_fold_stability_table(baseline_folds, engineered_folds))
 
-        if getattr(args, "charts", False):
-            p1 = plot_comparison_charts(baseline_results, engineered_results)
-            print(f"\nChart saved to: {p1}")
+        p1 = plot_comparison_charts(baseline_folds, engineered_folds)
+        print("\nGenerated plots:")
+        print(f"  - {p1}")
         return
 
     print(f"Running cross-validation for {args.feature_set} features …\n")
@@ -220,11 +220,6 @@ def main() -> None:
         choices=["engineered", "baseline", "both"],
         default="engineered",
         help="Which features to compare models on",
-    )
-    p_compare.add_argument(
-        "--charts",
-        action="store_true",
-        help="Save comparison charts to artifacts/ (requires --feature-set both)",
     )
 
     # eda

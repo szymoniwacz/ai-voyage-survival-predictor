@@ -87,6 +87,7 @@ def test_cmd_compare_baseline_uses_baseline_preprocessor(
     assert "TABLE" in out
 
 
+@patch("cli.plot_comparison_charts", return_value="artifacts/fold_comparison_clear.png")
 @patch("cli.format_comparison_table", return_value="TABLE")
 @patch("cli.format_feature_set_delta_table", return_value="DELTA")
 @patch("cli.format_fold_stability_table", return_value="STABILITY")
@@ -106,6 +107,7 @@ def test_cmd_compare_both_runs_two_comparisons(
     mock_stability,
     mock_delta,
     mock_fmt,
+    mock_plot,
     capsys,
 ):
     args = argparse.Namespace(train="data/raw/train.csv", feature_set="both")
@@ -124,7 +126,7 @@ def test_cmd_compare_both_runs_two_comparisons(
     assert "STABILITY" in out
 
 
-@patch("cli.plot_comparison_charts", return_value="artifacts/comparison_metrics.png")
+@patch("cli.plot_comparison_charts", return_value="artifacts/fold_comparison_clear.png")
 @patch("cli.format_comparison_table", return_value="TABLE")
 @patch("cli.format_feature_set_delta_table", return_value="DELTA")
 @patch("cli.format_fold_stability_table", return_value="STABILITY")
@@ -135,7 +137,7 @@ def test_cmd_compare_both_runs_two_comparisons(
 @patch("cli.preprocess", return_value=pd.DataFrame({"Survived": [0, 1]}))
 @patch("cli.preprocess_baseline", return_value=pd.DataFrame({"Survived": [0, 1]}))
 @patch("cli.load_data", return_value=pd.DataFrame({"a": [1]}))
-def test_cmd_compare_both_with_charts_saves_charts(
+def test_cmd_compare_both_generates_plots(
     mock_load,
     mock_preprocess_baseline,
     mock_preprocess,
@@ -144,17 +146,15 @@ def test_cmd_compare_both_with_charts_saves_charts(
     mock_stability,
     mock_delta,
     mock_fmt,
-    mock_plot_comparison,
+    mock_plot,
     capsys,
 ):
-    args = argparse.Namespace(
-        train="data/raw/train.csv", feature_set="both", charts=True
-    )
+    args = argparse.Namespace(train="data/raw/train.csv", feature_set="both")
     cmd_compare(args)
-    mock_plot_comparison.assert_called_once()
+    mock_plot.assert_called_once()
     out = capsys.readouterr().out
-    assert "Chart saved to" in out
-    assert "comparison_metrics.png" in out
+    assert "Generated plots:" in out
+    assert "fold_comparison_clear.png" in out
 
 
 # ---------------------------------------------------------------------------

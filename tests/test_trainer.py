@@ -319,16 +319,7 @@ def test_format_fold_stability_table_shows_degraded_folds():
 def test_plot_comparison_charts_saves_file(tmp_path):
     from formatters.charts import plot_comparison_charts
 
-    results = {
-        "random_forest": {
-            "accuracy_mean": 0.84,
-            "accuracy_std": 0.01,
-            "f1_mean": 0.78,
-            "f1_std": 0.01,
-            "roc_auc_mean": 0.88,
-            "roc_auc_std": 0.01,
-        }
-    }
-    path = plot_comparison_charts(results, results, output_dir=tmp_path)
+    folds = {"random_forest": [0.85, 0.87, 0.84, 0.88, 0.86]}
+    path = plot_comparison_charts(folds, folds, output_dir=tmp_path)
     assert path.exists()
     assert path.suffix == ".png"
